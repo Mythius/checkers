@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Checkers</title>
+	<link rel="icon" type="image/x-icon" href="icon.png">
+	<style>
+		body{
+			margin: 0;
+		}
+		canvas{
+			background-color: lightgray;
+			box-sizing: border-box;
+		}
+	</style>
+	<script src="helpers.js"></script>
+	<script src="grid.js"></script>
+	<script src="input.js"></script>
+	<script src="BezierCurve.js"></script>
+	<script src="sprite.js"></script>
+	<script src="checkers.js"></script>
+</head>
+<body>
+	<canvas width=800 height=800></canvas>
+	<script>
+		
+		var canvas = obj('canvas');
+		var ctx = canvas.getContext('2d');
+
+		var board = new Grid(8,8,100);
+		var botmakingmove = false;
+
+		mouse.start(canvas);
+
+		function loop(){
+			setTimeout(loop,1000/30);
+			ctx.clearRect(-2,-2,canvas.width+2,canvas.height+2);
+			ctx.lineWidth = 2;
+			board.draw();
+			input();
+			// board.forEach(tile=>{if(tile.jump_mode)tile.draw_box('cyan')}); // debug jumps
+			CheckerPiece.drawAll();
+		}
+
+		Tile.prototype.piece = null;
+		Tile.prototype.draw = function(){
+			let ct = this.getCenter();
+			let w2 = this.grid.scale/2;
+			ctx.fillStyle = this.color;
+			ctx.fillRect(ct.x-w2,ct.y-w2,w2*2,w2*2);
+		}
+		Grid.prototype.draw = function(){
+			this.forEach(tile=>{
+				tile.draw();
+			})
+		}
+
+		function setup(){
+			board.forEach(tile=>{
+				tile.color = tile.x%2==tile.y%2?'lightgray':'green';
+				if(tile.color == 'green'){
+					if(tile.y < 3){
+						new CheckerPiece(tile,'red');
+					}
+					if(tile.y > 4){
+						new CheckerPiece(tile,'black');
+					}
+				}
+			})
+		}
+
+		var yd = {'black':-1,'red':1};
+		
+		var turn = 'black';
+		var current_piece = null,jumps=[],jpls=[];
+		function input(){
+			let ct = board.getActiveTile();
+			if(current_piece){
+				let y_dir = yd[turn];
+				board.forEach(tile=>{tile.jump_mode = false; tile.js = null; });
+				let possible = calculateSquares(current_piece.currentTile,y_dir);
+				if(current_piece.isKing) possible = possible.concat(calculateSquares(current_piece.currentTile,y_dir*-1))
+				if(mouse.down){
+					current_piece.position = mouse.pos;
+					if(jumps.length){
+						let pt = jumps[jumps.length-1];
+						calculateSquares(pt,y_dir,true);
+						if(current_piece.isKing) calculateSquares(pt,y_dir*-1,true);
+					}
+					if(ct && ct.jump_mode && !jpls.includes(ct.js)){
+						jumps.push(ct);
+						jpls.push(ct.js);
+						calculateSquares(ct,y_dir,true);
+						if(current_piece.isKing) calculateSquares(ct,y_dir*-1,true);
+					}
+					drawLine();
+				} else {
+					if(ct && possible.includes(ct)){
+						current_piece.moveToTile(ct);
+						current_piece.position = ct.getCenter();
+						current_piece = null;
+						removeJumpedCheckers().then(nextTurn);
+					} else {
+						current_piece.position = current_piece.currentTile.getCenter();
+						current_piece = null;
+					}
+				}
+			} else {
+				if(!botmakingmove){
+					board.forEach(tile=>{tile.jump_mode = false; tile.js = null; });
+					jumps = [];
+					jpls = [];
+				}
+				if(ct && ct.piece && ct.piece.color == turn && mouse.down){
+					current_piece = ct.piece;
+				}
+			}
+		}
+
+		async function removeJumpedCheckers(){
+			let proms = [];
+			for(let j of jpls){
+				if(j.piece) proms.push(j.piece.remove());
+			}
+			await Promise.all(proms);
+		}
+
+		function drawLine(){
+			let bzc = new BezierCurve.Curve;
+			bzc.addPoint(current_piece.currentTile);
+			for(let j of jumps) bzc.addPoint(j);
+			bzc.mousecontrol = true;
+			bzc.draw(bzc.jpath.length>1);
+		}
+
+		function nextTurn(){
+			if(turn == 'black'){
+				turn = 'red';
+				setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
+			} else {
+				turn = 'black';
+				setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
+			}
+		}
+
+		function calculateSquares(square,yd,oj=false){
+			let possibilities = [];
+			let dl = board.getTileAt(square.x-1,square.y+yd);
+			if(dl && !dl.piece && !oj){
+				possibilities.push(dl);
+			}
+			let dr = board.getTileAt(square.x+1,square.y+yd);
+			if(dr && !dr.piece && !oj){
+				possibilities.push(dr);
+			}
+			let check_jump = false;
+			if(jumps.length > 0){
+				if(jumps[jumps.length-1] == square){
+					check_jump = true;
+				} else {
+					check_jump = false;
+				}
+			} else {
+				check_jump = true;
+			}
+			if(dl && dl.piece && dl.piece.color!=turn){
+				let jl = board.getTileAt(square.x-2,square.y+yd*2);
+				if(jl && !jl.piece && !jumps.slice(-2).includes(jl)){
+					if(check_jump) possibilities.push(jl);
+					jl.jump_mode = check_jump;
+					jl.js = dl;
+				}
+			}
+			if(dr && dr.piece && dr.piece.color!=turn){
+				let jr = board.getTileAt(square.x+2,square.y+yd*2);
+				if(jr && !jr.piece && !jumps.slice(-2).includes(jr)){
+					if(check_jump) possibilities.push(jr);
+					jr.jump_mode = check_jump;
+					jr.js = dr;
+				}
+			}
+			if(!oj){
+				if(jumps.length>0){
+					return [jumps[jumps.length-1]];
+				}
+			}
+			return possibilities;
+		}
+
+
+		async function botMove(){
+			botmakingmove = true;
+			let pieces = CheckerPiece.pieces.filter(e=>e.color==turn);
+			let d = yd[turn];
+			pieces.sort((a,b)=>Math.random()-.5);
+			for(let piece of pieces){
+				let possible = calculateSquares(piece.currentTile,d);
+				if(piece.isKing) possible = possible.concat(calculateSquares(piece.currentTile,d*-1));
+				if(possible.length){
+					possible.sort((a,b)=>Math.random()-.5);
+					piece.makeAutoMove(possible[0]);
+					if(possible[0].jump_mode){
+						await botJump(possible[0],piece);
+					}
+					nextTurn();
+					botmakingmove = false;
+					return;
+				}
+			}
+			botmakingmove = false;
+		}
+
+		async function botJump(square,piece){
+			jpls.push(square.js);
+			let d = yd[turn];
+			let possible = calculateSquares(square,d,true);
+			if(piece.isKing) possible = possible.concat(calculateSquares(piece.currentTile,d*-1,true));
+			// board.forEach(tile=>{if(tile.jump_mode)tile.draw_box('cyan')}); // debug jumps
+			possible = possible.filter(e=>{
+				if(e.js){
+					if(jpls.includes(e.js)){
+						return false;
+					} else {
+						return true;
+					}
+				}
+				return false;
+			});
+			possible = possible.sort((a,b)=>Math.random()-.5);
+			if(possible.length){
+				await wait(500);
+				await piece.makeAutoMove(possible[0]);
+				if(possible[0].js) await botJump(possible[0],piece).catch(e=>{console.error(e)});
+			}
+			await removeJumpedCheckers();
+		}
+
+		function wait(t=1000){
+			return new Promise((res,rej)=>{
+				setTimeout(()=>{
+					res();
+				},t);
+			});
+		}
+
+
+		setup();
+		loop();
+
+
+	</script>
+</body>
+</html>
