@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="viewport" content="width=800, user-scalable:0">
 	<title>Checkers</title>
 	<link rel="icon" type="image/x-icon" href="icon.png">
 	<style>
 		body{
 			margin: 0;
+			overflow: hidden;
 		}
 		canvas{
 			background-color: lightgray;
@@ -23,6 +24,8 @@
 </head>
 <body>
 	<canvas width=800 height=800></canvas>
+	<br>
+	<button onclick="botMove()">Start</button>
 	<script>
 		
 		var canvas = obj('canvas');
