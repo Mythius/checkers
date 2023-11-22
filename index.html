@@ -14,6 +14,21 @@
 			background-color: lightgray;
 			box-sizing: border-box;
 		}
+		img{
+			position: absolute;
+			top: 0;
+			left: 800px;
+		}
+		#options{
+			position: fixed;
+			left: 400px;
+			top: 400px;
+			transform: translateX(-50%) translateY(-50%);
+			padding: 20px;
+			background-color: #444;
+			color: white;
+			display: none;
+		}
 	</style>
 	<script src="helpers.js"></script>
 	<script src="grid.js"></script>
@@ -24,8 +39,14 @@
 </head>
 <body>
 	<canvas width=800 height=800></canvas>
+	<img width=40 height=40 src=settings.png>
 	<br>
 	<button onclick="botMove()">Start</button>
+	<div id="options">
+		Options
+		Red is Computer: <input id=redb type="checkbox"><br>
+		Black is Computer: <input id=blackb type="checkbox">
+	</div>
 	<script>
 		
 		var canvas = obj('canvas');
@@ -58,6 +79,22 @@
 				tile.draw();
 			})
 		}
+
+		let red_bot = false;
+		let black_bot = false;
+		let options = false;
+
+		obj('img').on('click',e=>{
+			options = !options;
+			if(options){
+				obj('#options').style.display = 'inherit';
+			} else {
+				obj('#options').style.display = 'none';
+				red_bot = obj('#redb').checked;
+				black_bot = obj('#blackb').checked;
+			}
+
+		});
 
 		function setup(){
 			board.forEach(tile=>{
@@ -121,6 +158,17 @@
 			}
 		}
 
+		Touch.init(callback=>{
+			if(callback.type == 'scroll'){
+				mouse.down = true;
+				mouse.pos.x = callback.x;
+				mouse.pos.y = callback.y;
+			}
+			if(callback.type == 'end'){
+				mouse.down = false;
+			}
+		});
+
 		async function removeJumpedCheckers(){
 			let proms = [];
 			for(let j of jpls){
@@ -140,10 +188,10 @@
 		function nextTurn(){
 			if(turn == 'black'){
 				turn = 'red';
-				setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
+				if(red_bot) setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
 			} else {
 				turn = 'black';
-				setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
+				if(black_bot)setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
 			}
 		}
 
