@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=840, user-scalable:0">
+	<meta name="viewport" content="width=840, user-scalable=0">
 	<title>Checkers</title>
 	<link rel="icon" type="image/x-icon" href="icon.png">
 	<style>
@@ -191,7 +191,7 @@
 				if(red_bot) setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
 			} else {
 				turn = 'black';
-				if(black_bot)setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
+				if(black_bot) setTimeout(()=>{try{botMove()}catch(e){console.error(e)}},250);
 			}
 		}
 
@@ -245,11 +245,22 @@
 			let pieces = CheckerPiece.pieces.filter(e=>e.color==turn);
 			let d = yd[turn];
 			pieces.sort((a,b)=>Math.random()-.5);
+			for(let i=0;i<pieces.length;i++){
+				let piece = pieces[i];
+				let possible = calculateSquares(piece.currentTile,d,false);
+				for(let p of possible){
+					if(p.jump_mode){
+						pieces.unshift(pieces.splice(i,1)[0]);
+						break;
+					}
+				}
+			}
 			for(let piece of pieces){
+				board.forEach(tile=>{tile.jump_mode = false; tile.js = null; });
 				let possible = calculateSquares(piece.currentTile,d);
 				if(piece.isKing) possible = possible.concat(calculateSquares(piece.currentTile,d*-1));
 				if(possible.length){
-					possible.sort((a,b)=>Math.random()-.5);
+					possible.sort((a,b)=>(+b.jump_mode)-(+a.jump_mode));
 					piece.makeAutoMove(possible[0]);
 					if(possible[0].jump_mode){
 						await botJump(possible[0],piece);
